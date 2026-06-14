@@ -1,0 +1,9 @@
+# Maven build output
+/target/
+
+# Local MySQL runtime data
+/.mysql-data/
+/.mysql-run/
+
+# macOS and editor noise
+.DS_Store
