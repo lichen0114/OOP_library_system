@@ -3,14 +3,32 @@
 USE library_system;
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
+TRUNCATE TABLE reviews;
+TRUNCATE TABLE reservations;
+TRUNCATE TABLE favorites;
+TRUNCATE TABLE level_requests;
 TRUNCATE TABLE borrow_records;
 TRUNCATE TABLE book_isbns;
 TRUNCATE TABLE books;
 TRUNCATE TABLE users;
+TRUNCATE TABLE user_levels;
+TRUNCATE TABLE app_settings;
 SET FOREIGN_KEY_CHECKS = 1;
 START TRANSACTION;
 
--- 20 users from Users.json. Password values are preserved as provided.
+-- Permission levels used by login, borrowing, favorites, and admin checks.
+INSERT INTO user_levels (level_code, display_name, max_borrow_days, max_active_loans, can_favorite, is_admin, registration_allowed, custom_level) VALUES
+('NORMAL', 'Normal Student', 7, 3, FALSE, FALSE, TRUE, FALSE),
+('VIP', 'VIP Student', 14, 5, TRUE, FALSE, TRUE, FALSE),
+('ADMIN', 'System Administrator', 0, 0, FALSE, TRUE, FALSE, FALSE),
+('RESEARCH', 'Research Student', 14, 8, TRUE, FALSE, FALSE, FALSE);
+
+-- Operational defaults for reminders and overdue fine display.
+INSERT INTO app_settings (setting_key, setting_value) VALUES
+('reminder_days', '3'),
+('fine_per_overdue_day', '5');
+
+-- 20 users from Users.json plus three demo accounts.
 INSERT INTO users (student_no, name, password_hash, role_level, created_at, status) VALUES
 ('A12345678', '張家豪', '2a9f8e7d6c5b4a3f2e1d9c8b7a', 'NORMAL', '2026-01-15 14:22:37', 'ACTIVE'),
 ('B87654321', '陳怡君', '8c7d6e5f4a3b2c1d9e8f7a6b5c', 'VIP', '2025-12-18 09:45:22', 'ACTIVE'),
@@ -687,6 +705,24 @@ INSERT INTO borrow_records (user_id, book_id, borrow_date, due_date, return_date
 (21, 196, DATE_ADD(NOW(), INTERVAL -2 DAY), DATE_ADD(NOW(), INTERVAL 5 DAY), NULL, 7, DATE_ADD(NOW(), INTERVAL -2 DAY)),
 (21, 197, DATE_ADD(NOW(), INTERVAL -12 DAY), DATE_ADD(NOW(), INTERVAL -5 DAY), DATE_ADD(NOW(), INTERVAL -4 DAY), 7, DATE_ADD(NOW(), INTERVAL -12 DAY)),
 (22, 198, DATE_ADD(NOW(), INTERVAL -10 DAY), DATE_ADD(NOW(), INTERVAL 4 DAY), NULL, 14, DATE_ADD(NOW(), INTERVAL -10 DAY));
+
+-- VIP demo favorites.
+INSERT INTO favorites (user_id, book_id) VALUES
+(22, 10),
+(22, 196);
+
+-- Demo reservations for active borrowed books.
+INSERT INTO reservations (user_id, book_id, status, requested_at) VALUES
+(22, 196, 'PENDING', DATE_ADD(NOW(), INTERVAL -1 DAY)),
+(21, 198, 'PENDING', DATE_ADD(NOW(), INTERVAL -1 DAY));
+
+-- Demo review for a returned demo borrow record.
+INSERT INTO reviews (record_id, user_id, book_id, rating, comment, created_at) VALUES
+(32, 21, 197, 5, 'Good reference for course projects.', DATE_ADD(NOW(), INTERVAL -3 DAY));
+
+-- Pending level request for admin workflow testing.
+INSERT INTO level_requests (user_id, requested_level_code, reason, status, requested_at) VALUES
+(21, 'VIP', 'Need a longer borrowing period for final project references.', 'PENDING', DATE_ADD(NOW(), INTERVAL -1 DAY));
 
 -- Reflect active borrow records in book status and reserve two unused books for admin testing.
 UPDATE books SET status = 'AVAILABLE';

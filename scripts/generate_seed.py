@@ -1,18 +1,31 @@
 #!/usr/bin/env python3
 import json
+import os
 import re
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).resolve().parents[1]))
 DATASET = ROOT / "專題預設數據 (1)"
 BOOKS_PATH = DATASET / "書籍資料" / "Books.json"
 USERS_PATH = DATASET / "使用者資料" / "Users.json"
 BORROW_RECORDS_PATH = DATASET / "借還紀錄資料" / "Borrow_records.json"
-OUTPUT_PATH = ROOT / "sql" / "seed.sql"
+OUTPUT_PATH = Path(os.environ.get("SEED_OUTPUT", ROOT / "sql" / "seed.sql"))
 
 PASSWORD_123_HASH = "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
 ADMIN_123_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
+
+LEVELS = [
+    ("NORMAL", "Normal Student", 7, 3, False, False, True, False),
+    ("VIP", "VIP Student", 14, 5, True, False, True, False),
+    ("ADMIN", "System Administrator", 0, 0, False, True, False, False),
+    ("RESEARCH", "Research Student", 14, 8, True, False, False, False),
+]
+
+SETTINGS = [
+    ("reminder_days", "3"),
+    ("fine_per_overdue_day", "5"),
+]
 
 
 def sql_string(value):
@@ -25,6 +38,10 @@ def sql_int(value):
     if value is None:
         return "NULL"
     return str(int(value))
+
+
+def sql_bool(value):
+    return "TRUE" if value else "FALSE"
 
 
 def relative_date_expr(value):
@@ -44,6 +61,17 @@ def values_line(values):
     return "(" + ", ".join(values) + ")"
 
 
+def append_insert(lines, title, table_and_columns, rows):
+    if not rows:
+        return
+    lines.extend([
+        title,
+        f"INSERT INTO {table_and_columns} VALUES",
+        ",\n".join(rows) + ";",
+        "",
+    ])
+
+
 def main():
     books = json.loads(BOOKS_PATH.read_text(encoding="utf-8"))
     users = json.loads(USERS_PATH.read_text(encoding="utf-8"))
@@ -55,16 +83,48 @@ def main():
         "USE library_system;",
         "SET NAMES utf8mb4;",
         "SET FOREIGN_KEY_CHECKS = 0;",
+        "TRUNCATE TABLE reviews;",
+        "TRUNCATE TABLE reservations;",
+        "TRUNCATE TABLE favorites;",
+        "TRUNCATE TABLE level_requests;",
         "TRUNCATE TABLE borrow_records;",
         "TRUNCATE TABLE book_isbns;",
         "TRUNCATE TABLE books;",
         "TRUNCATE TABLE users;",
+        "TRUNCATE TABLE user_levels;",
+        "TRUNCATE TABLE app_settings;",
         "SET FOREIGN_KEY_CHECKS = 1;",
         "START TRANSACTION;",
         "",
-        "-- 20 users from Users.json. Password values are preserved as provided.",
-        "INSERT INTO users (student_no, name, password_hash, role_level, created_at, status) VALUES",
     ]
+
+    level_rows = [
+        values_line([
+            sql_string(code),
+            sql_string(display_name),
+            sql_int(max_borrow_days),
+            sql_int(max_active_loans),
+            sql_bool(can_favorite),
+            sql_bool(is_admin),
+            sql_bool(registration_allowed),
+            sql_bool(custom_level),
+        ])
+        for code, display_name, max_borrow_days, max_active_loans, can_favorite, is_admin, registration_allowed, custom_level in LEVELS
+    ]
+    append_insert(
+        lines,
+        "-- Permission levels used by login, borrowing, favorites, and admin checks.",
+        "user_levels (level_code, display_name, max_borrow_days, max_active_loans, can_favorite, is_admin, registration_allowed, custom_level)",
+        level_rows,
+    )
+
+    setting_rows = [values_line([sql_string(key), sql_string(value)]) for key, value in SETTINGS]
+    append_insert(
+        lines,
+        "-- Operational defaults for reminders and overdue fine display.",
+        "app_settings (setting_key, setting_value)",
+        setting_rows,
+    )
 
     user_rows = [
         values_line([
@@ -103,13 +163,13 @@ def main():
             sql_string("ACTIVE"),
         ]),
     ])
-    lines.append(",\n".join(user_rows) + ";")
-    lines.append("")
+    append_insert(
+        lines,
+        "-- 20 users from Users.json plus three demo accounts.",
+        "users (student_no, name, password_hash, role_level, created_at, status)",
+        user_rows,
+    )
 
-    lines.extend([
-        "-- 200 books from Books.json. Auto-increment IDs are preserved by insertion order.",
-        "INSERT INTO books (title, authors, subjects, publisher, publish_year, edition, format_desc, source, note, status) VALUES",
-    ])
     book_rows = [
         values_line([
             sql_string(book.get("題名")),
@@ -125,25 +185,19 @@ def main():
         ])
         for book in books
     ]
-    lines.append(",\n".join(book_rows) + ";")
-    lines.append("")
+    append_insert(
+        lines,
+        "-- 200 books from Books.json. Auto-increment IDs are preserved by insertion order.",
+        "books (title, authors, subjects, publisher, publish_year, edition, format_desc, source, note, status)",
+        book_rows,
+    )
 
     isbn_rows = []
     for index, book in enumerate(books, start=1):
         for isbn in book.get("識別號") or []:
             isbn_rows.append(values_line([str(index), sql_string(isbn)]))
-    if isbn_rows:
-        lines.extend([
-            "-- ISBNs split into a child table.",
-            "INSERT INTO book_isbns (book_id, isbn) VALUES",
-            ",\n".join(isbn_rows) + ";",
-            "",
-        ])
+    append_insert(lines, "-- ISBNs split into a child table.", "book_isbns (book_id, isbn)", isbn_rows)
 
-    lines.extend([
-        "-- 30 JSON borrow records plus demo-account history.",
-        "INSERT INTO borrow_records (user_id, book_id, borrow_date, due_date, return_date, borrow_days, created_at) VALUES",
-    ])
     record_rows = [
         values_line([
             str(record["user_id"]),
@@ -185,8 +239,73 @@ def main():
             "DATE_ADD(NOW(), INTERVAL -10 DAY)",
         ]),
     ])
-    lines.append(",\n".join(record_rows) + ";")
-    lines.append("")
+    append_insert(
+        lines,
+        "-- 30 JSON borrow records plus demo-account history.",
+        "borrow_records (user_id, book_id, borrow_date, due_date, return_date, borrow_days, created_at)",
+        record_rows,
+    )
+
+    favorite_rows = [
+        values_line(["22", "10"]),
+        values_line(["22", "196"]),
+    ]
+    append_insert(lines, "-- VIP demo favorites.", "favorites (user_id, book_id)", favorite_rows)
+
+    reservation_rows = [
+        values_line([
+            "22",
+            "196",
+            sql_string("PENDING"),
+            "DATE_ADD(NOW(), INTERVAL -1 DAY)",
+        ]),
+        values_line([
+            "21",
+            "198",
+            sql_string("PENDING"),
+            "DATE_ADD(NOW(), INTERVAL -1 DAY)",
+        ]),
+    ]
+    append_insert(
+        lines,
+        "-- Demo reservations for active borrowed books.",
+        "reservations (user_id, book_id, status, requested_at)",
+        reservation_rows,
+    )
+
+    review_rows = [
+        values_line([
+            str(len(borrow_records) + 2),
+            "21",
+            "197",
+            "5",
+            sql_string("Good reference for course projects."),
+            "DATE_ADD(NOW(), INTERVAL -3 DAY)",
+        ])
+    ]
+    append_insert(
+        lines,
+        "-- Demo review for a returned demo borrow record.",
+        "reviews (record_id, user_id, book_id, rating, comment, created_at)",
+        review_rows,
+    )
+
+    level_request_rows = [
+        values_line([
+            "21",
+            sql_string("VIP"),
+            sql_string("Need a longer borrowing period for final project references."),
+            sql_string("PENDING"),
+            "DATE_ADD(NOW(), INTERVAL -1 DAY)",
+        ])
+    ]
+    append_insert(
+        lines,
+        "-- Pending level request for admin workflow testing.",
+        "level_requests (user_id, requested_level_code, reason, status, requested_at)",
+        level_request_rows,
+    )
+
     lines.extend([
         "-- Reflect active borrow records in book status and reserve two unused books for admin testing.",
         "UPDATE books SET status = 'AVAILABLE';",
@@ -203,7 +322,10 @@ def main():
     ])
 
     OUTPUT_PATH.write_text("\n".join(lines), encoding="utf-8")
-    print(f"Wrote {OUTPUT_PATH.relative_to(ROOT)} with {len(users)} JSON users, {len(books)} JSON books, and {len(borrow_records)} JSON borrow records.")
+    print(
+        f"Wrote {OUTPUT_PATH} with {len(users)} JSON users, "
+        f"{len(books)} JSON books, and {len(borrow_records)} JSON borrow records."
+    )
 
 
 if __name__ == "__main__":

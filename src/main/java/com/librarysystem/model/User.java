@@ -7,17 +7,17 @@ public class User {
     private final String studentNo;
     private final String name;
     private final String passwordHash;
-    private final RoleLevel roleLevel;
+    private final UserLevel userLevel;
     private final LocalDateTime createdAt;
     private final UserStatus status;
 
     public User(int userId, String studentNo, String name, String passwordHash,
-                RoleLevel roleLevel, LocalDateTime createdAt, UserStatus status) {
+                UserLevel userLevel, LocalDateTime createdAt, UserStatus status) {
         this.userId = userId;
         this.studentNo = studentNo;
         this.name = name;
         this.passwordHash = passwordHash;
-        this.roleLevel = roleLevel;
+        this.userLevel = userLevel;
         this.createdAt = createdAt;
         this.status = status;
     }
@@ -38,8 +38,16 @@ public class User {
         return passwordHash;
     }
 
-    public RoleLevel getRoleLevel() {
-        return roleLevel;
+    public UserLevel getUserLevel() {
+        return userLevel;
+    }
+
+    public String getLevelCode() {
+        return userLevel.getCode();
+    }
+
+    public String getLevelDisplayName() {
+        return userLevel.getDisplayName();
     }
 
     public LocalDateTime getCreatedAt() {
@@ -51,7 +59,7 @@ public class User {
     }
 
     public boolean isAdmin() {
-        return roleLevel == RoleLevel.ADMIN;
+        return userLevel.isAdmin();
     }
 
     public boolean isSuspended() {

@@ -14,11 +14,18 @@ public class BorrowRecord {
     private final LocalDateTime returnDate;
     private final int borrowDays;
     private final LocalDateTime createdAt;
+    private final int overdueDays;
+    private final int fineAmount;
+    private final Integer reviewId;
+    private final Integer reviewRating;
+    private final String reviewComment;
 
     public BorrowRecord(int recordId, int userId, String studentNo, String userName,
                         int bookId, String bookTitle, LocalDateTime borrowDate,
                         LocalDateTime dueDate, LocalDateTime returnDate,
-                        int borrowDays, LocalDateTime createdAt) {
+                        int borrowDays, LocalDateTime createdAt,
+                        int overdueDays, int fineAmount,
+                        Integer reviewId, Integer reviewRating, String reviewComment) {
         this.recordId = recordId;
         this.userId = userId;
         this.studentNo = studentNo;
@@ -30,6 +37,11 @@ public class BorrowRecord {
         this.returnDate = returnDate;
         this.borrowDays = borrowDays;
         this.createdAt = createdAt;
+        this.overdueDays = overdueDays;
+        this.fineAmount = fineAmount;
+        this.reviewId = reviewId;
+        this.reviewRating = reviewRating;
+        this.reviewComment = reviewComment;
     }
 
     public int getRecordId() {
@@ -76,6 +88,26 @@ public class BorrowRecord {
         return createdAt;
     }
 
+    public int getOverdueDays() {
+        return overdueDays;
+    }
+
+    public int getFineAmount() {
+        return fineAmount;
+    }
+
+    public Integer getReviewId() {
+        return reviewId;
+    }
+
+    public Integer getReviewRating() {
+        return reviewRating;
+    }
+
+    public String getReviewComment() {
+        return reviewComment;
+    }
+
     public String getReturnStatus() {
         if (returnDate != null) {
             return "Returned";
@@ -84,5 +116,16 @@ public class BorrowRecord {
             return "Overdue";
         }
         return "Borrowed";
+    }
+
+    public String getReviewSummary() {
+        if (reviewId == null || reviewRating == null) {
+            return "";
+        }
+        String summary = reviewRating + "/5";
+        if (reviewComment != null && !reviewComment.isBlank()) {
+            summary += " - " + reviewComment;
+        }
+        return summary;
     }
 }

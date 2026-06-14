@@ -75,6 +75,29 @@ public class BookDao {
         return Optional.empty();
     }
 
+    public List<Book> listFavorites(int userId) throws SQLException {
+        String sql = """
+                SELECT %s, COALESCE(GROUP_CONCAT(DISTINCT i.isbn ORDER BY i.isbn SEPARATOR ', '), '') AS isbns
+                FROM favorites f
+                JOIN books b ON b.book_id = f.book_id
+                LEFT JOIN book_isbns i ON i.book_id = b.book_id
+                WHERE f.user_id = ?
+                GROUP BY %s, f.created_at
+                ORDER BY f.created_at DESC
+                """.formatted(BOOK_COLUMNS, BOOK_COLUMNS);
+        try (Connection connection = Database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, userId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                List<Book> books = new ArrayList<>();
+                while (resultSet.next()) {
+                    books.add(mapBook(resultSet));
+                }
+                return books;
+            }
+        }
+    }
+
     public int addBook(Book book) throws SQLException {
         String bookSql = """
                 INSERT INTO books
