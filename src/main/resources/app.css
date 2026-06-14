@@ -1,0 +1,69 @@
+.root {
+    -fx-font-family: "Arial", "PingFang TC", sans-serif;
+    -fx-font-size: 13px;
+    -fx-background-color: #f6f7f9;
+}
+
+.auth-root {
+    -fx-background-color: #f6f7f9;
+}
+
+.app-title {
+    -fx-font-size: 26px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #172033;
+}
+
+.screen-title {
+    -fx-font-size: 20px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #172033;
+}
+
+.top-bar {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent #dfe3ea transparent;
+}
+
+.field-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #4a5568;
+}
+
+.muted-label {
+    -fx-text-fill: #607086;
+}
+
+.warning-label {
+    -fx-text-fill: #b45309;
+    -fx-font-weight: 700;
+}
+
+.primary-button {
+    -fx-background-color: #1f5fbf;
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 700;
+}
+
+.side-panel {
+    -fx-padding: 12;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dfe3ea;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-min-width: 360;
+    -fx-max-width: 390;
+}
+
+.stats-box {
+    -fx-padding: 18;
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dfe3ea;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.stat-line {
+    -fx-font-size: 15px;
+}
